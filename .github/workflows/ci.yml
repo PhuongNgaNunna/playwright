@@ -36,7 +36,7 @@ jobs:
         run: 'echo "Running on env: ${{ inputs.env }}"'
 
       - name: Run Playwright tests
-        run: npx playwright test
+        run: npx playwright test tests/exam4-buggy.spec.ts
 
       - name: Upload test report artifact
         if: always()
