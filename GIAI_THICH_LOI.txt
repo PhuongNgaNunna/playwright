@@ -1,0 +1,152 @@
+================================================================================
+GIẢI THÍCH LỖI — EXAM 4
+================================================================================
+
+Họ và tên: Nguyễn Phương Nga - nunna
+Ngày: 25/06/2026
+
+--------------------------------------------------------------------------------
+Bug #1 — TC-01: Xác minh thông tin Superhero trong Dynamic Table
+--------------------------------------------------------------------------------
+
+Vị trí lỗi:
+  Dòng 11–14, file exam4-buggy.spec.ts:
+    await expect(page.locator('tbody tr').nth(0).locator('td').nth(0)).toHaveText('Captain America');
+    await expect(page.locator('tbody tr').nth(1).locator('td').nth(0)).toHaveText('Spider-Man');
+    await expect(page.locator('tbody tr').nth(2).locator('td').nth(0)).toHaveText('Iron Man');
+    await expect(page.locator('tbody tr').nth(3).locator('td').nth(0)).toHaveText('Hulk');
+
+Root cause:
+  Trang /apps/dynamic-table/ có tính năng SHUFFLE — thứ tự các hàng được xáo
+  ngẫu nhiên mỗi lần load trang. Code cũ dùng nth(0), nth(1), nth(2), nth(3)
+  để truy cập hàng theo chỉ số cố định, giả định rằng Captain America luôn
+  ở hàng 0, Spider-Man ở hàng 1, v.v. Điều này sai về cơ bản: chỉ số hàng
+  không có nghĩa gì khi thứ tự bị xáo trộn. Playwright tìm đúng phần tử DOM
+  tại đúng chỉ số, nhưng nội dung text không khớp với giá trị expect — test
+  fail ngay từ lần chạy đầu tiên hoặc bất kỳ lần nào thứ tự thay đổi.
+
+Cách sửa:
+  Thay vì dùng nth(N), dùng filter({ hasText: hero }) để tìm hàng theo nội dung:
+
+    const heroes = ['Captain America', 'Spider-Man', 'Iron Man', 'Hulk'];
+    for (const hero of heroes) {
+      await expect(page.locator('tbody tr').filter({ hasText: hero })).toBeVisible();
+    }
+
+  Cách này không quan tâm hàng đó đứng ở vị trí nào — chỉ cần hero name
+  xuất hiện trong một hàng bất kỳ là PASS. Dùng toBeVisible() là web-first
+  assertion có auto-wait, không cần đoán thời điểm DOM sẵn sàng.
+
+Nếu không sửa, hậu quả:
+  Test là FLAKY — đôi khi PASS (may mắn thứ tự khớp), đôi khi FAIL (thứ tự
+  khác). Flaky test nguy hiểm hơn test FAIL hoàn toàn: nó che giấu lỗi thật
+  và làm mất niềm tin vào bộ test. Trên CI/CD, pipeline sẽ fail không dự đoán
+  được, developer tốn thời gian re-run thay vì tìm lỗi thật.
+
+--------------------------------------------------------------------------------
+Bug #2 — TC-02: Tăng tốc Progress Bar và xác nhận kết quả
+--------------------------------------------------------------------------------
+
+Vị trí lỗi:
+  Dòng 25–26 (kiểm tra giá trị ban đầu):
+    const initialPercent = await progressBar.getAttribute('percent');
+    expect(initialPercent).toBe('5');
+
+  Dòng 32–33 (kiểm tra sau khi boost):
+    const percentAfterBoost = await progressBar.getAttribute('percent');
+    expect(percentAfterBoost).toBe('95');
+
+Root cause:
+  Hai lỗi cùng loại — đọc giá trị rồi dùng plain JS expect():
+
+  1. getAttribute() là một snapshot tức thì của DOM tại thời điểm gọi.
+     Sau khi click Boost, progress bar thực hiện animation bất đồng bộ
+     (async). Giá trị 'percent' attribute chưa kịp cập nhật từ 5 lên 95.
+     Khi getAttribute() chạy ngay sau click(), nó đọc được giá trị cũ (5
+     hoặc giá trị trung gian), khiến so sánh .toBe('95') thất bại.
+
+  2. expect() từ Jest/Node (không phải Playwright) không có cơ chế retry.
+     Nó kiểm tra một lần duy nhất và fail ngay nếu giá trị chưa đúng,
+     không đợi DOM cập nhật. Đây là race condition: test chạy nhanh hơn
+     animation của browser.
+
+Cách sửa:
+  Dùng web-first assertion toHaveAttribute() của Playwright — nó tự động
+  retry cho đến khi attribute khớp hoặc hết timeout:
+
+    // Kiểm tra giá trị ban đầu
+    await expect(progressBar).toHaveAttribute('percent', '5');
+
+    // Kiểm tra sau khi boost — retry tối đa 15 giây chờ animation xong
+    await expect(progressBar).toHaveAttribute('percent', '95', { timeout: 15000 });
+
+  Không cần đọc vào biến trung gian, không cần waitForTimeout().
+  toHaveAttribute() poll DOM liên tục cho đến khi điều kiện đúng.
+
+Nếu không sửa, hậu quả:
+  Test fail DETERMINISTICALLY trên CI/CD (máy chậm hơn local). Trên máy
+  local developer có thể PASS do máy nhanh hơn, animation xong trước khi
+  getAttribute() chạy — tạo ra "works on my machine" bug kinh điển. Trên
+  CI ubuntu-latest tài nguyên bị chia sẻ, animation chậm hơn và test luôn
+  fail. Đây là loại flaky test tệ nhất: local PASS, CI FAIL.
+
+--------------------------------------------------------------------------------
+Bug #3 — TC-03: Thêm mục chi tiêu và xác nhận ngày ghi nhận
+--------------------------------------------------------------------------------
+
+Vị trí lỗi:
+  Dòng 49 — hardcode ngày cũ:
+    const expectedDate = '2024-06-15';
+
+  Dòng 50–51 — plain JS expect() so sánh ngày sai:
+    const actualDate = await newRow.locator('.input-date').inputValue();
+    expect(actualDate).toBe(expectedDate);
+
+  Dòng 54 — regex sai định dạng:
+    expect(expectedDate).toMatch(/^\d{2}\/\d{2}\/\d{4}$/);
+
+Root cause:
+  Có 3 lỗi trong TC-03 (lưu ý: các locator gốc như .new-entry, .input-description,
+  .input-type, .input-amount, .input-date đều ĐÚNG với DOM thật của trang):
+
+  1. Hardcode ngày cũ: '2024-06-15' là ngày đã qua hơn 1 năm. Budget Tracker
+     tự động điền ngày hôm nay vào input[type="date"] khi tạo entry mới. Giá
+     trị expectedDate '2024-06-15' không bao giờ bằng actualDate (ngày hiện
+     tại). Test fail MỖI NGÀY chạy, không có ngoại lệ nào.
+
+  2. Plain JS expect() không có auto-wait: inputValue() là snapshot tức thì,
+     expect().toBe() không có cơ chế retry. Nếu DOM chưa kịp render giá trị
+     ngày, test fail ngay lập tức mà không chờ đợi.
+
+  3. Regex sai định dạng: expectedDate là 'YYYY-MM-DD' (ví dụ '2026-06-25')
+     nhưng regex /^\d{2}\/\d{2}\/\d{4}$/ kiểm tra định dạng 'DD/MM/YYYY'
+     (dùng dấu gạch chéo /). Hai định dạng hoàn toàn khác nhau — YYYY không
+     khớp \d{2} và dấu '-' không phải '\/' — assertion này luôn fail bất kể
+     ngày là gì.
+
+Cách sửa:
+  // Tính ngày hôm nay động — YYYY-MM-DD là format của input[type="date"]
+  const today = new Date();
+  const expectedDate = today.toISOString().split('T')[0]; // "YYYY-MM-DD"
+
+  // Mở form nhập liệu mới (giữ locator gốc vì đúng với DOM)
+  await page.locator('button.new-entry').click();
+  const newRow = page.locator('tbody.entries tr').last();
+  await newRow.getByPlaceholder('Add a Description (e.g. wages, bills, etc.)').fill('Ăn trưa');
+  await newRow.getByRole('combobox').selectOption('expense');
+  await newRow.locator('input[type="number"]').fill('50000');
+
+  // Dùng toHaveValue() — web-first assertion có auto-wait, xóa bỏ regex sai
+  await expect(newRow.locator('input[type="date"]')).toHaveValue(expectedDate);
+
+  new Date().toISOString().split('T')[0] trả về chuỗi 'YYYY-MM-DD' của ngày
+  hiện tại. Test sẽ PASS bất kỳ ngày nào được chạy.
+
+Nếu không sửa, hậu quả:
+  Test fail 100% mỗi ngày — không phải flaky mà là DETERMINISTICALLY BROKEN.
+  Ngày hardcode sai sẽ không bao giờ khớp ngày thật của hệ thống. Regex sai
+  format luôn fail dù ngày đúng. Regression này che giấu luôn các bug thật
+  của Budget Tracker vì test không bao giờ chạy được đến assertion cuối.
+  Trên CI/CD, pipeline block mọi merge request dù code hoàn toàn đúng.
+
+================================================================================
