@@ -45,8 +45,8 @@ test.describe('QA Playground — E2E Flow', () => {
     const today = new Date();
     const expectedDate = today.toISOString().split('T')[0]; // "YYYY-MM-DD"
 
-    // 3. Mở form nhập liệu mới
-    await page.locator('button.new-entry').click();
+    // 3. Mở form nhập liệu mới bằng accessible role locator
+    await page.getByRole('button', { name: 'New Entry', exact: true }).click();
 
     // 4. Điền thông tin vào hàng mới (hàng cuối cùng trong tbody.entries)
     const newRow = page.locator('tbody.entries tr').last();
