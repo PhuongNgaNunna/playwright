@@ -13,8 +13,8 @@ môi trường Netlify. Suite gồm **20 test case** (12 E2E + 3 data-driven + 3
 | Mục | Nội dung |
 |-----|----------|
 | Họ tên | Nguyễn Phương Nga |
-| MSSV | _[Điền MSSV]_ |
-| Lớp | _[Điền lớp]_ |
+| MSSV | N/A |
+| Lớp | Playwright cowell |
 | Ứng dụng mục tiêu | WorkNest — https://worknest-site.netlify.app/ |
 | Repo | https://github.com/PhuongNgaNunna/playwright |
 | Video demo | _[Điền link YouTube unlisted / Google Drive, 2–4 phút]_ |
