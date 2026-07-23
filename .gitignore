@@ -1,0 +1,27 @@
+# Dependencies
+node_modules/
+
+# Playwright & Allure generated output (regenerated on every run)
+test-results/
+reports/allure-results/
+reports/allure-report/
+reports/playwright-html/
+.allure/
+blob-report/
+playwright/.cache/
+
+# Auth sessions captured by the setup project (regenerated on every run)
+.auth/
+
+# Local env overrides
+*.local
+.env
+
+# OS / editor
+.DS_Store
+.idea/
+.vscode/
+
+# NOTE: the following ARE committed on purpose (do not ignore):
+#   reports/categories.json
+#   tests/visual/visual.spec.ts-snapshots/

@@ -1,0 +1,14 @@
+[
+  {
+    "name": "Product Defects",
+    "description": "Application behaved incorrectly — a real bug in WorkNest (failed assertion on expected UI/data).",
+    "matchedStatuses": ["failed"],
+    "messageRegex": ".*(expect|toBe|toHaveText|toHaveURL|toBeVisible|toHaveCount).*"
+  },
+  {
+    "name": "Auto Test Defects",
+    "description": "Broken automation — locator not found, timeout, or network/environment error (not a product bug).",
+    "matchedStatuses": ["broken", "failed"],
+    "messageRegex": ".*(Timeout.*exceeded|locator|strict mode violation|net::|ECONNREFUSED|Target closed|waiting for).*"
+  }
+]

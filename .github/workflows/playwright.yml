@@ -1,0 +1,61 @@
+name: WorkNest Playwright Tests
+
+on:
+  push:
+    branches: [main, master, develop]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  test:
+    name: E2E + API + a11y (chromium)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      BASE_URL: https://worknest-site.netlify.app
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Playwright browser (chromium)
+        run: npx playwright install --with-deps chromium
+
+      # Visual tests are excluded on CI: pixel baselines are OS-specific
+      # (captured on macOS locally) and would mismatch the Linux runner.
+      - name: Run tests
+        run: npm run test:ci
+
+      - name: Generate Allure report
+        if: ${{ !cancelled() }}
+        run: npx allure generate reports/allure-results -o reports/allure-report --clean
+
+      - name: Upload Allure report
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: allure-report
+          path: reports/allure-report
+          retention-days: 14
+
+      - name: Upload Allure results
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: allure-results
+          path: reports/allure-results
+          retention-days: 14
+
+      - name: Upload Playwright HTML report
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-html-report
+          path: reports/playwright-html
+          retention-days: 14

@@ -1,0 +1,5 @@
+[
+  { "role": "admin", "email": "admin@worknest.com", "password": "admin123", "expectedRoute": "/" },
+  { "role": "manager", "email": "manager@worknest.com", "password": "manager123", "expectedRoute": "/" },
+  { "role": "employee", "email": "john@worknest.com", "password": "password123", "expectedRoute": "/" }
+]
